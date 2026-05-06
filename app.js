@@ -12,7 +12,7 @@ document.getElementById('select-categoria').addEventListener('change', async (e)
     selectMateria.disabled = true;
 
     // Busca as matérias únicas na tabela correta
-    const { data, error } = await _supabase.from('questoes_simulado').select('materia');
+    const { data, error } = await _supabase.from('questoes').select('materia');
 
     if (error) {
         selectMateria.innerHTML = `<option value="">❌ Erro ao buscar</option>`;
@@ -28,7 +28,7 @@ document.getElementById('select-categoria').addEventListener('change', async (e)
     selectMateria.disabled = false;
 });
 
-// 2. BUSCA AS QUESTÕES POR MATÉRIA
+// 2. BUSCA AS QUESTÕES POR MATÉRIA (COM ALEATORIEDADE)
 async function iniciarSimulado() {
     const materia = document.getElementById('select-materia').value;
     const container = document.getElementById('questoes-container');
@@ -46,19 +46,28 @@ async function iniciarSimulado() {
     placar.classList.add('hidden');
     document.getElementById('btn-conferir').classList.add('hidden');
     document.getElementById('btn-reiniciar').classList.add('hidden');
-    container.innerHTML = '<div class="placeholder loading">⏳ Carregando questões...</div>';
+    container.innerHTML = '<div class="placeholder loading">⏳ Carregando questões variadas...</div>';
 
-    // Busca as questões (limite de 10 por vez)
-    const { data, error } = await _supabase.from('questoes_simulado').select('*').eq('materia', materia).limit(10);
+    // Busca as questões (Limite de 20 para dar rotatividade)
+    const { data, error } = await _supabase
+        .from('questoes') 
+        .select('*')
+        .eq('materia', materia)
+        .limit(20); 
 
     if (error || !data || data.length === 0) {
         container.innerHTML = '<div class="placeholder">⚠️ Nenhuma questão encontrada.</div>';
         return;
     }
 
-    // Embaralha as questões
+    // --- ESSA É A PARTE QUE FALTAVA NA SUA IMAGEM ---
+    // Embaralha as questões para elas não virem sempre iguais
     questoesAtuais = data.sort(() => Math.random() - 0.5);
+    
+    // Chama a função que desenha as questões na tela
     renderizar();
+    
+    // Mostra o botão de conferir
     document.getElementById('btn-conferir').classList.remove('hidden');
 }
 
@@ -103,28 +112,23 @@ async function conferir() {
         const selecionada = selecionadaInput.value;
         const correta = q.resposta_correta.toUpperCase();
 
-        // Destaca a correta
         document.getElementById(`label-${q.id}-${correta}`)?.classList.add('correta');
 
         if (selecionada === correta) {
             acertos++;
-            // Lógica de peso: 1.5 para matérias bancárias, 1.0 para Português
             const peso = (materiaAtual === 'Língua Portuguesa') ? 1.0 : 1.5;
             pontuacaoTotal += peso;
         } else {
-            // Destaca a errada do usuário
             document.getElementById(`label-${q.id}-${selecionada}`)?.classList.add('errada');
         }
     });
 
-    // Cálculos de percentual
     const percentual = Math.round((acertos / questoesAtuais.length) * 100);
     
-    // Atualiza o placar e a barra verde
     document.getElementById('placar-texto').innerHTML = `✅ <strong>${acertos} acertos</strong> | 🏆 <strong>${pontuacaoTotal.toFixed(1)} pontos</strong> | 📊 <strong>${percentual}%</strong>`;
     
     const barra = document.getElementById('progresso-fill');
-    if (barra) barra.style.width = Math.min((pontuacaoTotal * 5), 100) + "%"; // Ajuste visual da barra
+    if (barra) barra.style.width = Math.min((pontuacaoTotal * 5), 100) + "%";
     
     const pontosTexto = document.getElementById('pontos');
     if (pontosTexto) pontosTexto.innerText = pontuacaoTotal.toFixed(1);
@@ -133,7 +137,6 @@ async function conferir() {
     document.getElementById('btn-conferir').classList.add('hidden');
     document.getElementById('btn-reiniciar').classList.remove('hidden');
     
-    // Volta ao topo para ver o resultado
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
